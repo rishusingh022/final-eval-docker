@@ -1,0 +1,84 @@
+version: "3"
+services:
+  auth-db:
+    image: postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ChangeItNow+328975
+      POSTGRES_DB: auth
+    volumes:
+      - ./auth-db:/var/lib/postgresql/data
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready", "-U", "postgres"]
+      interval: 10s
+      timeout: 10s
+      retries: 20
+
+  redis:
+    image: redis
+
+  auth-migration:
+    build: 
+      context: ./authServices
+      dockerfile: Dockerfile.migration
+    environment:
+      NODE_ENV: docker
+    depends_on:
+      auth-db:
+        condition: service_healthy
+
+  auth:
+    build: ./authServices
+    ports:
+      - "8000:8000"
+    environment:
+      NODE_ENV: docker
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET_KEY: secret_key_821
+
+    depends_on:
+      auth-db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      auth-migration:
+        condition: service_started
+
+  server-db:
+    image: postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ChangeItNow+328975
+      POSTGRES_DB: eval-be
+    volumes:
+      - ./server-db:/var/lib/postgresql/data
+
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready", "-U", "postgres"]
+      interval: 10s
+      timeout: 10s
+      retries: 20
+
+  server-migration:
+    build: 
+      context: ./final-eval-be
+      dockerfile: Dockerfile.migration
+    environment:
+      NODE_ENV: docker
+    depends_on:
+      server-db:
+        condition: service_healthy
+
+  server:
+    build: ./final-eval-be
+    ports:
+      - "8080:8080"
+    environment:
+      NODE_ENV: docker
+    depends_on:
+      server-db:
+        condition: service_healthy
+      server-migration:
+        condition: service_started
